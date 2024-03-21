@@ -100,7 +100,8 @@ fn get_unix_pid(fd: &impl AsRawFd) -> io::Result<Option<u32>> {
         target_os = "freebsd",
         target_os = "dragonfly",
         target_os = "openbsd",
-        target_os = "netbsd"
+        target_os = "netbsd",
+        target_os = "illumos"
     ))]
     {
         let _ = fd;
@@ -134,6 +135,16 @@ fn get_unix_uid(fd: &impl AsRawFd) -> io::Result<Option<u32>> {
         nix::unistd::getpeereid(fd)
             .map(|(uid, _)| Some(uid.into()))
             .map_err(|e| e.into())
+    }
+
+    #[cfg(target_os = "illumos")]
+    {
+        let mut ucred = std::ptr::null_mut();
+        if unsafe { nix::libc::getpeerucred(fd.as_raw_fd(), &mut ucred) } != 0 {
+            return Err(io::Error::last_os_error());
+        };
+        let uid = unsafe { nix::libc::ucred_geteuid(ucred) };
+        Ok(Some(uid))
     }
 }
 
