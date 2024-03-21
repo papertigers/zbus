@@ -357,6 +357,18 @@ fn get_unix_peer_creds_blocking(fd: RawFd) -> io::Result<crate::fdo::ConnectionC
         // FIXME: Handle pid fetching too.
         Ok(crate::fdo::ConnectionCredentials::default().set_unix_user_id(uid))
     }
+    #[cfg(target_os = "illumos")]
+    {
+        let mut ucred = std::ptr::null_mut();
+        if unsafe { nix::libc::getpeerucred(fd.as_raw_fd(), &mut ucred) } != 0 {
+            return Err(io::Error::last_os_error());
+        };
+        let uid = unsafe { nix::libc::ucred_geteuid(ucred) };
+        let pid = unsafe { nix::libc::ucred_getpid(ucred) };
+        Ok(crate::fdo::ConnectionCredentials::default()
+            .set_unix_user_id(uid)
+            .set_process_id(pid as u32))
+    }
 }
 
 // Send 0 byte as a separate SCM_CREDS message.
